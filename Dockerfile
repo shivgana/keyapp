@@ -8,7 +8,7 @@ WORKDIR /app
 #RUN pip install -r requirements.txt
 RUN pip install flask
 RUN pip install requests 
-RUN pip install jwt==0.5.2
+RUN pip install PyJWT
 #RUN pip install 
 
 COPY . /app
