@@ -143,7 +143,7 @@ def authorize(token,path,method):
         "token_type_hint": "requesting_party_token", 
         "token": rpt.json()['access_token']
     }
-    data = f"{CLIENT_ID}:{CLIENT_SECRET}"
+    data = "{}:{}".format(CLIENT_ID, CLIENT_SECRET)
     rpt = requests.post(introspect_url, data=payload, headers={'authorization': 'Basic {}'.format(base64.b64encode(data.encode("utf-8")).decode("utf-8"))})
     print(rpt.json())
     return permission(resource_id, method, rpt.json()['permissions'])
