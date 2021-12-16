@@ -10,6 +10,6 @@ RUN pip install flask
 RUN pip install requests 
 RUN pip install PyJWT
 #RUN pip install 
-
+EXPOSE 5000
 COPY . /app
 CMD [ "python", "./app.py" ]
