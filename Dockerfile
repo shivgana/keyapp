@@ -7,7 +7,7 @@ RUN apt-get update -y && \
 WORKDIR /app
 #RUN pip install -r requirements.txt
 RUN pip install flask
-RUN pip install keycloak==3.0.1
+#RUN pip install keycloak==3.0.1
 
 COPY . /app
 CMD [ "python", "./app.py" ]
