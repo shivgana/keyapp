@@ -12,4 +12,6 @@ RUN pip install PyJWT
 #RUN pip install 
 EXPOSE 5000
 COPY . /app
-CMD [ "python", "./app.py" ]
+#CMD [ "python", "./app.py" ]
+ENV FLASK_APP=app
+CMD ["flask","run"]
