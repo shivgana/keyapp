@@ -14,4 +14,4 @@ EXPOSE 5000
 COPY . /app
 #CMD [ "python", "./app.py" ]
 ENV FLASK_APP=app
-CMD ["flask","run", "--host=0.0.0.0", "--port=5001"]
+CMD ["flask","run", "--port=5001"]
