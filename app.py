@@ -95,17 +95,17 @@ def secured():
     access_token = data['token']
     
     #print(base64.b64decode(access_token),validate=False)
-    try:
-        token_data =   jwt.decode(access_token, public_key, audience=CLIENT_ID, algorithms=['RS256']) 
-        if token_data['exp'] < int(time.time()):
-            return redirect(url_for('login'))
-    except (ExpiredSignatureError):
-        print("refresh")
-        token = refresh()
-        session.pop('token')
-        session['token'] = token
-        access_token = token['access_token']
-        print()
+    #try:
+    #   token_data =   jwt.decode(access_token, public_key, audience=CLIENT_ID, algorithms=['RS256']) 
+    #    if token_data['exp'] < int(time.time()):
+    #        return redirect(url_for('login'))
+    #except (ExpiredSignatureError):
+    #    print("refresh")
+    #    token = refresh()
+    #    session.pop('token')
+    #    session['token'] = token
+    #    access_token = token['access_token']
+    #    print()
     #############
     token = access_token.split('.')[1]
     resp = authorize(token, request.path, request.method)
@@ -149,6 +149,8 @@ def authorize(token, path,method):
         }
     rpt = requests.post(token_url, data=payload, headers={'Authorization': 'Bearer {}'.format(access_token)})
     #print(rpt.json())
+    if rpt.status_code != 200:
+        return 403
     payload = {
         "token_type_hint": "requesting_party_token", 
         "token": rpt.json()['access_token']
@@ -163,8 +165,8 @@ def permission(res_id, method, permissions):
         print(permission)
         if (permission['rsid'] == res_id) and (method in permission['scopes']):
             print(True)
-            return "200"
-    return "403"
+            return 200
+    return 403
     
 def get_res_id(path):
     payload = {
