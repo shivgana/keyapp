@@ -18,11 +18,11 @@ logout_url = 'http://localhost:8080/auth/realms/k-splice/protocol/openid-connect
 resource_url = "http://localhost:8080/auth/realms/k-splice/authz/protection/resource_set"
 introspect_url = 'http://localhost:8080/auth/realms/k-splice/protocol/openid-connect/token/introspect'
 CLIENT_ID = os.getenv("CLIENT_ID","keycloaklib")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET","5cf65bfe-4949-4e74-bd0a-7a4f93f20455")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET","QLLglHkHjI45ilcBwEvjmS9Ekzv3mnbl")
 ACCESS_T_FORMAT = 'urn:ietf:params:oauth:token-type:jwt'
 ID_TOKEN_FORMAT = "http://openid.net/specs/openid-connect-core-1_0.html#IDToken"
 public_key = os.getenv("PUBLIC_KEY","""-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAty5HwJExj1RAMM73X+LDm+MpnRQJACZSwQ95B3ofGVzTDsymLkfkQDoHlugDX1/xwlWjHh9hWW8MUIbk0yfx81YsYbhoLQY4mu+/c6ZrBVReWgHgWlEx8H3gRaT/fBv7vLH+j6jRoQhob13qHREYGGB0VV5D17XFwCJjuuJWnw8sW612WorqOUSjvm5UuxXk9hiEDtwYHA+T0s1PrabGCnWktdGyMOHtS51ntVfM2VdPGNZxoxT/VxGp43ZFxL6/e2U81M38neINmVL2WQE/6llFsuR1US4g7oIq7yinr2E4BI2mqVO/o3d6QHAPbC1j63Qey18CZIrogKAOHZzWXQIDAQAB
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAySDDzUjUzTp8cD+LtI9fefmbEPXLKRYwdS9CuyZSfqK4xO+XGBDEwjnju3Su4NtxQC6y/xOxLEsQJ57rcazb4Yb0QY1zr4BZYsPEbvvxp6w6fO1Pni9cr2FFmicYDJcKJ2CI6uJ9ZfLUiu6rXlwLRCblRMEI612rJNJ1Wb9L5Up/S5iVOCZOQUSQKBOgMN46AnSADyO/7gLrmanfHslVRtY/1oT0tAqmaR1a+EOr5FuabA5YdwwSWyi6HD/81cnz5HWc+u3vBcWqeIB25huQpRrbw3AKb6bqq9WIaD1BQKbunS6Q1Ir1ye6fVGZcQugVjwXn+KbQt1Mwz+Qh2uJqnwIDAQAB
 -----END PUBLIC KEY-----
 """)
 
@@ -78,6 +78,7 @@ def refresh():
     }
     try:
         resp = requests.post(token_url,data=data)
+        print(resp.json())
     except:
         return None
     return resp.json()
@@ -89,22 +90,25 @@ def secured():
     if session.get('token','not set') == 'not set':
         session['redirect'] = str(request.url_rule)
         return redirect(url_for('login'))    
-    
+    print(session['token']['access_token'])
     data["token"] = session['token']['access_token']
     access_token = data['token']
+    
     #print(base64.b64decode(access_token),validate=False)
     try:
-        token_data = jwt.decode(access_token, public_key, audience='app', algorithms=['RS256']) 
+        token_data =   jwt.decode(access_token, public_key, audience=CLIENT_ID, algorithms=['RS256']) 
         if token_data['exp'] < int(time.time()):
             return redirect(url_for('login'))
     except (ExpiredSignatureError):
-        session['token'] = refresh()
+        print("refresh")
+        token = refresh()
+        session.pop('token')
+        session['token'] = token
+        access_token = token['access_token']
+        print()
     #############
-    
-    payload = access_token.split('.')[1]
-    #print(type(json.loads(token_data)))
-    #print(dict(token_data.replace("'","\"")))
-    resp = authorize(payload,request.url_rule, request.method)
+    token = access_token.split('.')[1]
+    resp = authorize(token, request.path, request.method)
     #############
     if resp != "200":
         return render_template('unauthorized.html')
@@ -126,27 +130,33 @@ def logout():
     return redirect(url_for('index'))
 
 
-def authorize(token,path,method):
+def authorize(token, path,method):
     access_token = session['token']['access_token']
+    print(access_token)
     
     ### get resource id
     resource_id = get_res_id(path)
     
+    perm = resource_id+"#"+method
     ### get RPT token
     payload  = {
         "grant_type": "urn:ietf:params:oauth:grant-type:uma-ticket",
-        "audience": CLIENT_ID
-    }
-    rpt = requests.post(token_url, data=payload, headers={'authorization': 'Bearer {}'.format(access_token)})
-    print(rpt.json()['access_token'])
+        "audience": CLIENT_ID,
+        "client_id": CLIENT_ID,
+        "claim_token": token,
+        "claim_token_format": ID_TOKEN_FORMAT,
+        "permission": perm
+        }
+    rpt = requests.post(token_url, data=payload, headers={'Authorization': 'Bearer {}'.format(access_token)})
+    #print(rpt.json())
     payload = {
         "token_type_hint": "requesting_party_token", 
         "token": rpt.json()['access_token']
     }
-    data = "{}:{}".format(CLIENT_ID, CLIENT_SECRET)
-    rpt = requests.post(introspect_url, data=payload, headers={'authorization': 'Basic {}'.format(base64.b64encode(data.encode("utf-8")).decode("utf-8"))})
-    print(rpt.json())
-    return permission(resource_id, method, rpt.json()['permissions'])
+    data = f"{CLIENT_ID}:{CLIENT_SECRET}"
+    per = requests.post(introspect_url, data=payload, headers={'Authorization': 'Basic {}'.format(base64.b64encode(data.encode("utf-8")).decode("utf-8"))})
+    print(per.json())
+    return permission(resource_id, method, per.json()['permissions'])
    
 def permission(res_id, method, permissions):
     for permission in permissions:
@@ -157,10 +167,18 @@ def permission(res_id, method, permissions):
     return "403"
     
 def get_res_id(path):
-    access_token = session['token']['access_token']
-    resource = requests.get('http://localhost:8080/auth/realms/k-splice/authz/protection/resource_set?uri={}'.format(path), headers={'authorization': 'Bearer {}'.format(access_token)})
+    payload = {
+        "grant_type": "client_credentials",
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "scope": "roles"
+    }
+    pat = requests.post(token_url, data=payload, headers={"content-type": "application/x-www-form-urlencoded"})
+    print(pat.json())
+    pat = pat.json()['access_token']
+    resource = requests.get('http://localhost:8080/auth/realms/k-splice/authz/protection/resource_set?uri={}'.format(path), headers={'Authorization': 'Bearer {}'.format(pat)})
     print(resource.json())
-    if len(resource.json()) == 0 :
+    if len(resource.json()) == 0:
         return "Resource not found"
     resource_id = resource.json()[0]
     return resource_id
